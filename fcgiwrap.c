@@ -524,6 +524,7 @@ static void handle_fcgi_request(void)
 	pid_t pid;
 
 	struct fcgi_context fc;
+	struct stat dest;
 
 	if (pipe(pipe_in) < 0) goto err_pipein;
 	if (pipe(pipe_out) < 0) goto err_pipeout;
@@ -568,6 +569,19 @@ static void handle_fcgi_request(void)
 				cgi_error("403 Forbidden", "Cannot chdir to script directory", filename);
 
 			*last_slash = '/';
+
+			/* important: lstat, not stat to prevent symlinking to root-owned binaries */
+			lstat(filename, &dest);
+			/* some more useful checks from suEXEC: https://httpd.apache.org/docs/2.2/suexec.html */
+			if (dest.st_uid == 0)
+				cgi_error("403 Forbidden", "Execution as root not allowed", NULL);
+			if ((dest.st_mode & S_ISUID) != 0)
+				cgi_error("403 Forbidden", "Executing setuid binaries not allowed", NULL);
+			if ((dest.st_mode & S_IWGRP) != 0 || (dest.st_mode & S_IWOTH) != 0)
+				cgi_error("403 Forbidden", "Executing binaries writable as group or other not allowed", NULL);
+
+			setgid(dest.st_gid);
+			setuid(dest.st_uid);
 
 			execl(filename, filename, (void *)NULL);
 			cgi_error("502 Bad Gateway", "Cannot execute script", filename);
