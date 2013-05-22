@@ -575,10 +575,10 @@ static void handle_fcgi_request(void)
 			/* some more useful checks from suEXEC: https://httpd.apache.org/docs/2.2/suexec.html */
 			if (dest.st_uid == 0)
 				cgi_error("403 Forbidden", "Execution as root not allowed", NULL);
-			if ((dest.st_mode & S_ISUID) != 0)
+			if ((dest.st_mode & S_ISUID) == S_ISUID)
 				cgi_error("403 Forbidden", "Executing setuid binaries not allowed", NULL);
-			if ((dest.st_mode & S_IWGRP) != 0 || (dest.st_mode & S_IWOTH) != 0)
-				cgi_error("403 Forbidden", "Executing binaries writable as group or other not allowed", NULL);
+			if ((dest.st_mode & S_IWGRP) == S_IWGRP || (dest.st_mode & S_IWOTH) == S_IWOTH)
+				cgi_error("403 Forbidden", "Executing binaries writable for group or other not allowed", NULL);
 
 			setgid(dest.st_gid);
 			setuid(dest.st_uid);
